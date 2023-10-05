@@ -1,13 +1,31 @@
 #!/usr/bin/python3
-""" Review module for the HBNB project """
+"""This is the state class"""
+from os import getenv
+from sqlalchemy import String, DateTime, Column, ForeignKey
+from sqlalchemy.orm import relationship
+import models
 from models.base_model import BaseModel, Base
-from sqlalchemy import Column, ForeignKey, String
+from models.city import City
 
 
-class Review(BaseModel, Base):
-    """ Review class to store review information """
-    __tablename__ = 'reviews'
+class State(BaseModel, Base):
+    """This is the class for State
+    Attributes:
+        name: input name
+    """
 
-    place_id = Column(String(60), ForeignKey("places.id"), nullable=False)
-    user_id = Column(String(60), ForeignKey("users.id"), nullable=False)
-    text = Column(String(1024), nullable=False)
+    __tablename__ = "states"
+    name = Column(String(128), nullable=False)
+
+    if getenv("HBNB_TYPE_STORAGE") == "db":
+        cities = relationship("City", backref="state", cascade="all, delete-orphan")
+    else:
+
+        @property
+        def cities(self):
+            """Getter attribute in case of file storage"""
+            return [
+                city
+                for city in models.storage.all(City).values()
+                if city.state_id == self.id
+            ]

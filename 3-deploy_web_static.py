@@ -1,88 +1,56 @@
 #!/usr/bin/python3
-"""Comment"""
-from fabric.api import *
-import os
-import re
-from datetime import datetime
+"""
+With Facric , creates a tgz archive
+from web_static content folder
+"""
 
-env.user = 'ubuntu'
-env.hosts = ['3.80.74.138', '3.88.68.105']
+from fabric.api import env, local, put, run
+from datetime import datetime
+from os.path import exists, isdir
+
+env.hosts = ["34.236.171.16", "3.237.45.190"]
+env.user = "ubuntu"
+env.key_filename = "~/.ssh/id_rsa"
 
 
 def do_pack():
-    """Function to compress files in an archive"""
-    local("mkdir -p versions")
-    filename = "versions/web_static_{}.tgz".format(datetime.strftime(
-        datetime.now(),
-        "%Y%m%d%H%M%S"))
-    result = local("tar -cvzf {} web_static"
-                   .format(filename))
-    if result.failed:
+    """Creates a tgz archive using fabric"""
+    try:
+        date = datetime.now().strftime("%Y%m%d%H%M%S")
+        if isdir("versions") is False:
+            local("mkdir versions")
+        filename = "versions/web_static_{}.tgz".format(date)
+        local("tar -cvzf {} web_static".format(filename))
+        return filename
+    except Exception as ex:
         return None
-    return filename
 
 
 def do_deploy(archive_path):
-    """Comment"""
-    if not os.path.isfile(archive_path):
+    """deploy web static with fabric"""
+    if exists(archive_path) is False:
         return False
 
-    filename_regex = re.compile(r'[^/]+(?=\.tgz$)')
-    match = filename_regex.search(archive_path)
-
-    # Upload the archive to the /tmp/ directory of the web server
-    archive_filename = match.group(0)
-    result = put(archive_path, "/tmp/{}.tgz".format(archive_filename))
-    if result.failed:
+    try:
+        filename = archive_path.split("/")[-1]
+        no_excep = filename.split(".")[0]
+        path = "/data/web_static/releases/"
+        put(archive_path, "/tmp/")
+        run("sudo mkdir -p {}{}/".format(path, no_excep))
+        run("sudo tar -xzf /tmp/{} -C {}{}/".format(filename, path, no_excep))
+        run("sudo rm /tmp/{}".format(filename))
+        run("sudo mv {0}{1}/web_static/* {0}{1}/".format(path, no_excep))
+        run("sudo rm -rf {}{}/web_static".format(path, no_excep))
+        run("sudo rm -rf /data/web_static/current")
+        run("sudo ln -s {}{}/ /data/web_static/current".format(path, no_excep))
+        return True
+    except BaseException:
         return False
-    # Uncompress the archive to the folder
-    #     /data/web_static/releases/<archive filename without extension> on
-    #     the web server
-
-    result = run(
-        "mkdir -p /data/web_static/releases/{}/".format(archive_filename))
-    if result.failed:
-        return False
-    result = run("tar -xzf /tmp/{}.tgz -C /data/web_static/releases/{}/"
-                 .format(archive_filename, archive_filename))
-    if result.failed:
-        return False
-
-    # Delete the archive from the web server
-    result = run("rm /tmp/{}.tgz".format(archive_filename))
-    if result.failed:
-        return False
-    result = run("mv /data/web_static/releases/{}"
-                 "/web_static/* /data/web_static/releases/{}/"
-                 .format(archive_filename, archive_filename))
-    if result.failed:
-        return False
-    result = run("rm -rf /data/web_static/releases/{}/web_static"
-                 .format(archive_filename))
-    if result.failed:
-        return False
-
-    # Delete the symbolic link /data/web_static/current from the web server
-    result = run("rm -rf /data/web_static/current")
-    if result.failed:
-        return False
-
-    #  Create a new the symbolic link
-    #  /data/web_static/current on the web server,
-    #     linked to the new version of your code
-    #     (/data/web_static/releases/<archive filename without extension>)
-    result = run("ln -s /data/web_static/releases/{}/ /data/web_static/current"
-                 .format(archive_filename))
-    if result.failed:
-        return False
-
-    return True
 
 
 def deploy():
-    """Deploy"""
-    archive_pack = do_pack()
-    if archive_pack is None:
+    """do path an do deploy"""
+    archive_path = do_pack()
+    if archive_path is None:
         return False
-    deployed = do_deploy(archive_pack)
-    return deployed
+    return do_deploy(archive_path)
