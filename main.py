@@ -28,7 +28,7 @@ city_2_1.save()
 
 
 """
- Verification
+ Verification of code
 """
 print("")
 all_states = storage.all(State)
